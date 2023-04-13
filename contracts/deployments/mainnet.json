@@ -1,0 +1,10 @@
+{
+  "MerkleDistributor": {
+    "address": "",
+    "abi": "MerkleDistributor"
+  },
+  "SDL": {
+    "address": "0xA95C5ebB86E0dE73B4fB8c47A45B792CFeA28C23",
+    "abi": "ERC20"
+  }
+}
