@@ -17,6 +17,7 @@ async function main() {
       '--updateContract <true/false>',
       'true if script should update MerkleDistributor with the new distribution'
     )
+    .option('--expiryTimestamp <seconds>', 'timestamp when unclaimed tokens can be withdrawn')
 
   program.parse(process.argv)
   const opts = program.opts()
@@ -39,9 +40,9 @@ async function main() {
   let func
   let amount
 
-  if (distribution[3].gt(0)) {
+  if (distribution[4].gt(0)) {
     func = 'updateDistribution'
-    amount = BigNumber.from(tree.tokenTotal).sub(distribution[5])
+    amount = BigNumber.from(tree.tokenTotal).sub(distribution[4])
   } else {
     func = 'addDistribution'
     amount = BigNumber.from(tree.tokenTotal)
@@ -59,11 +60,20 @@ async function main() {
 
   // Updates MerkleDistributor with new merkle tree details
   if (opts.updateContract == 'true') {
-    let tx = await merkleDistributor[func](token.address, tree.merkleRoot, amount)
+    if (!opts.expiryTimestamp) {
+      throw new Error('Expiry timestamp must be set to update MerkleDistributor')
+    }
+
+    let tx = await merkleDistributor[func](
+      token.address,
+      tree.merkleRoot,
+      amount,
+      opts.expiryTimestamp
+    )
     await tx.wait()
   }
 
-  if ((await merkleDistributor.distributions(token.address))[4] != tree.merkleRoot) {
+  if ((await merkleDistributor.distributions(token.address))[3] != tree.merkleRoot) {
     throw new Error('On-chain distribution must be updated before updating the merkle DB')
   }
 
