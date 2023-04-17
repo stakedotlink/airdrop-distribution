@@ -5,7 +5,7 @@ import { parseBalanceMap } from '../../src/parse-balance-map'
 import { getContract, isTokenSupported } from '../utils/helpers'
 
 async function main() {
-  program.version('0.0.0').requiredOption('--token <name>', 'input name of token to distribute')
+  program.version('0.0.0').requiredOption('--token <symbol>', 'symbol of token to distribute')
 
   program.parse(process.argv)
   const opts = program.opts()

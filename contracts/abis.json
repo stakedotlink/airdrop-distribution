@@ -4,5 +4,9 @@
     "function updateDistribution(address _token, bytes32 _merkleRoot, uint256 _additionalAmount)",
     "function distributions(address _token) view returns (tuple(address token, bool timeLimitEnabled, bool isPaused, uint256 timeOfLastUpdate, bytes32 merkleRoot, uint256 totalAmount))"
   ],
-  "ERC20": ["function approve(address _spender, uint256 _amount)"]
+  "ERC20": [
+    "function approve(address _spender, uint256 _amount)",
+    "function balanceOf(address _account) view returns (uint256)",
+    "function transfer(address _receiver, uint256 _amount)"
+  ]
 }
