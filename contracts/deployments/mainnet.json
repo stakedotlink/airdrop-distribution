@@ -6,5 +6,9 @@
   "SDL": {
     "address": "0xA95C5ebB86E0dE73B4fB8c47A45B792CFeA28C23",
     "abi": "ERC20"
+  },
+  "LINK": {
+    "address": "0x514910771af9ca656af840dff83e8264ecf986ca",
+    "abi": "ERC20"
   }
 }
