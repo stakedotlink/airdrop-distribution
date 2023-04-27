@@ -8,6 +8,7 @@
     "update-merkle-data": "ts-node scripts/merkleGeneration/update-merkle-data.ts",
     "sdl-generate-balance-map": "ts-node scripts/balanceMapGeneration/SDL/generate-balance-map.ts",
     "sdl-patch": "ts-node scripts/balanceMapGeneration/SDL/patch.ts",
+    "link-generate-balance-map": "ts-node scripts/balanceMapGeneration/LINK/generate-balance-map.ts",
     "tsc": "tsc",
     "prettier": "prettier --check \"src/**/*.ts*\" \"scripts/**/*.ts*\"",
     "prettier:fix": "prettier --write \"src/**/*.ts*\" \"scripts/**/*.ts*\""
