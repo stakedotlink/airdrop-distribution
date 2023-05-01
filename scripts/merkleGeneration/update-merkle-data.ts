@@ -26,9 +26,12 @@ async function main() {
     throw new Error('Token is not supported on the selected network')
 
   const tree = JSON.parse(
-    fs.readFileSync(`scripts/merkleGeneration/${opts.token}/outputTree.${network.name}.json`, {
-      encoding: 'utf8',
-    })
+    fs.readFileSync(
+      `scripts/merkleGeneration/outputTrees/${opts.token}/tree.${network.name}.json`,
+      {
+        encoding: 'utf8',
+      }
+    )
   )
 
   if (typeof tree !== 'object') throw new Error('Invalid JSON')

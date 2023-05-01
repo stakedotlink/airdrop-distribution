@@ -4,7 +4,7 @@
   "description": "stake.link Airdrop Distribution",
   "license": "MIT",
   "scripts": {
-    "generate-merkle-root": "ts-node scripts/merkleGeneration/generate-merkle-root.ts",
+    "generate-merkle-tree": "ts-node scripts/merkleGeneration/generate-merkle-tree.ts",
     "update-merkle-data": "ts-node scripts/merkleGeneration/update-merkle-data.ts",
     "sdl-generate-balance-map": "ts-node scripts/balanceMapGeneration/SDL/generate-balance-map.ts",
     "sdl-patch": "ts-node scripts/balanceMapGeneration/SDL/patch.ts",

@@ -29,7 +29,7 @@ const excludeAddresses = [
 
 const readBalanceData = (name: string) => {
   let json = JSON.parse(
-    fs.readFileSync(`scripts/balanceMapGeneration/SDL/patch/${name}.json`, {
+    fs.readFileSync(`scripts/balanceMapGeneration/SDL/balanceData/patch/${name}.json`, {
       encoding: 'utf8',
     })
   )
@@ -187,7 +187,7 @@ async function main() {
   })
 
   fs.writeFileSync(
-    `scripts/merkleGeneration/SDL/inputMap.${network.name}.json`,
+    `scripts/balanceMapGeneration/SDL/outputBalanceMaps/balanceMap.${network.name}.json`,
     JSON.stringify(balanceMap, null, 1)
   )
 }

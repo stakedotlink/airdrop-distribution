@@ -14,9 +14,12 @@ async function main() {
     throw new Error('Token is not supported on the selected network')
 
   const balances = JSON.parse(
-    fs.readFileSync(`scripts/merkleGeneration/${opts.token}/inputMap.${network.name}.json`, {
-      encoding: 'utf8',
-    })
+    fs.readFileSync(
+      `scripts/balanceMapGeneration/${opts.token}/outputBalanceMaps/balanceMap.${network.name}.json`,
+      {
+        encoding: 'utf8',
+      }
+    )
   )
 
   if (typeof balances !== 'object') throw new Error('Invalid JSON')
@@ -25,7 +28,7 @@ async function main() {
   const token = await getContract(opts.token)
 
   fs.writeFileSync(
-    `scripts/merkleGeneration/${opts.token}/outputTree.${network.name}.json`,
+    `scripts/merkleGeneration/outputTrees/${opts.token}/tree.${network.name}.json`,
     JSON.stringify({ token: token.address, networkId, ...parseBalanceMap(balances) }, null, 1)
   )
 }
