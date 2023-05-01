@@ -45,7 +45,7 @@ async function main() {
   })
 
   fs.writeFileSync(
-    `scripts/merkleGeneration/LINK/inputMap.${network.name}.json`,
+    `scripts/balanceMapGeneration/LINK/outputBalanceMaps/balanceMap.${network.name}.json`,
     JSON.stringify(balanceMap, null, 1)
   )
 }
