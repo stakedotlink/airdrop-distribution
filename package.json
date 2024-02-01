@@ -5,8 +5,10 @@
   "license": "MIT",
   "scripts": {
     "generate-merkle-tree": "ts-node scripts/merkleGeneration/generate-merkle-tree.ts",
+    "generate-merkle-tree-pp": "ts-node scripts/merkleGeneration/generate-merkle-tree-pp.ts",
     "update-merkle-data": "ts-node scripts/merkleGeneration/update-merkle-data.ts",
     "sdl-generate-balance-map": "ts-node scripts/balanceMapGeneration/SDL/generate-balance-map.ts",
+    "pp-generate-balance-map": "ts-node scripts/balanceMapGeneration/SDL/generate-balance-map-jan-24.ts",
     "sdl-patch": "ts-node scripts/balanceMapGeneration/SDL/patch.ts",
     "link-generate-balance-map": "ts-node scripts/balanceMapGeneration/LINK/generate-balance-map.ts",
     "tsc": "tsc",
