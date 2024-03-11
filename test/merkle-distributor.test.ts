@@ -1,8 +1,9 @@
 import { ethers } from 'hardhat'
 import { expect } from 'chai'
 import { getAccounts } from './utils/helpers'
-import { loadFixture, time } from '@nomicfoundation/hardhat-toolbox/network-helpers'
+import { loadFixture } from '@nomicfoundation/hardhat-toolbox/network-helpers'
 import { StandardMerkleTree } from '@openzeppelin/merkle-tree'
+import { SignerWithAddress } from '@nomicfoundation/hardhat-ethers/signers'
 
 // Copied and modified from: https://github.com/Uniswap/merkle-distributor/blob/master/test/MerkleDistributor.spec.ts
 // Most tests have been removed as core functionality has not changed, focus on testing multiple distributions
@@ -11,6 +12,7 @@ const ZERO_BYTES32 = '0x00000000000000000000000000000000000000000000000000000000
 
 describe('MerkleDistributor', () => {
   let accounts: string[]
+  let signers: SignerWithAddress[]
 
   async function fixture() {
     const token = await ethers.deployContract('Token', ['Token', 'TKN', 1000000])
@@ -20,16 +22,16 @@ describe('MerkleDistributor', () => {
   }
 
   before(async () => {
-    ;({ accounts } = await getAccounts())
+    ;({ accounts, signers } = await getAccounts())
   })
 
   describe('#claim', () => {
     it('fails for empty proof', async () => {
       const { distributor, token } = await loadFixture(fixture)
-      await distributor.addDistribution(await token.getAddress(), ZERO_BYTES32, 0, 0)
+      await distributor.addDistribution(await token.getAddress(), ZERO_BYTES32, ZERO_BYTES32, 0)
       await expect(
-        distributor.claimDistribution(await token.getAddress(), 0, accounts[1], 10, [])
-      ).to.be.revertedWith('MerkleDistributor: Invalid proof')
+        distributor.connect(signers[1]).claimDistribution(await token.getAddress(), 10, [])
+      ).to.be.revertedWithCustomError(distributor, 'InvalidProof()')
     })
 
     describe('two account tree', () => {
@@ -44,7 +46,7 @@ describe('MerkleDistributor', () => {
           ['address', 'uint256']
         )
         await token.transfer(await distributor.getAddress(), 201n)
-        await distributor.addDistribution(await token.getAddress(), tree.root, 201n, 0)
+        await distributor.addDistribution(await token.getAddress(), tree.root, ZERO_BYTES32, 201n)
 
         return { distributor, token, tree }
       }
@@ -54,16 +56,16 @@ describe('MerkleDistributor', () => {
 
         const proof0 = tree.getProof(0)
         await expect(
-          distributor.claimDistribution(await token.getAddress(), 0, accounts[1], 100, proof0)
+          distributor.connect(signers[1]).claimDistribution(await token.getAddress(), 100, proof0)
         )
           .to.emit(distributor, 'Claimed')
-          .withArgs(await token.getAddress(), 0, accounts[1], 100)
+          .withArgs(accounts[1], await token.getAddress(), 100)
         const proof1 = tree.getProof(1)
         await expect(
-          distributor.claimDistribution(await token.getAddress(), 1, accounts[2], 101, proof1)
+          distributor.connect(signers[2]).claimDistribution(await token.getAddress(), 101, proof1)
         )
           .to.emit(distributor, 'Claimed')
-          .withArgs(await token.getAddress(), 1, accounts[2], 101)
+          .withArgs(accounts[2], await token.getAddress(), 101)
       })
 
       it('transfers the token', async () => {
@@ -71,7 +73,9 @@ describe('MerkleDistributor', () => {
 
         const proof0 = tree.getProof(0)
         expect(await token.balanceOf(accounts[1])).to.eq(0)
-        await distributor.claimDistribution(await token.getAddress(), 0, accounts[1], 100, proof0)
+        await distributor
+          .connect(signers[1])
+          .claimDistribution(await token.getAddress(), 100, proof0)
         expect(await token.balanceOf(accounts[1])).to.eq(100)
       })
 
@@ -81,7 +85,9 @@ describe('MerkleDistributor', () => {
         const proof0 = tree.getProof(0)
         expect(await distributor.getClaimed(await token.getAddress(), accounts[1])).to.eq(0)
         expect(await distributor.getClaimed(await token.getAddress(), accounts[2])).to.eq(0)
-        await distributor.claimDistribution(await token.getAddress(), 0, accounts[1], 100, proof0)
+        await distributor
+          .connect(signers[1])
+          .claimDistribution(await token.getAddress(), 100, proof0)
         expect(await distributor.getClaimed(await token.getAddress(), accounts[1])).to.eq(100)
         expect(await distributor.getClaimed(await token.getAddress(), accounts[2])).to.eq(0)
       })
@@ -90,68 +96,46 @@ describe('MerkleDistributor', () => {
         const { distributor, token, tree } = await loadFixture(fixture2)
 
         const proof0 = tree.getProof(0)
-        await distributor.claimDistribution(await token.getAddress(), 0, accounts[1], 100, proof0)
+        await distributor
+          .connect(signers[1])
+          .claimDistribution(await token.getAddress(), 100, proof0)
         await expect(
-          distributor.claimDistribution(await token.getAddress(), 0, accounts[1], 100, proof0)
-        ).to.be.revertedWith('MerkleDistributor: No claimable tokens')
+          distributor.connect(signers[1]).claimDistribution(await token.getAddress(), 100, proof0)
+        ).to.be.revertedWithCustomError(distributor, 'NothingToClaim()')
       })
 
       it('cannot claim more than once: 0 and then 1', async () => {
         const { distributor, token, tree } = await loadFixture(fixture2)
 
-        await distributor.claimDistribution(
-          await token.getAddress(),
-          0,
-          accounts[1],
-          100,
-          tree.getProof(0)
-        )
-        await distributor.claimDistribution(
-          await token.getAddress(),
-          1,
-          accounts[2],
-          101,
-          tree.getProof(1)
-        )
+        await distributor
+          .connect(signers[1])
+          .claimDistribution(await token.getAddress(), 100, tree.getProof(0))
+        await distributor
+          .connect(signers[2])
+          .claimDistribution(await token.getAddress(), 101, tree.getProof(1))
 
         await expect(
-          distributor.claimDistribution(
-            await token.getAddress(),
-            0,
-            accounts[1],
-            100,
-            tree.getProof(0)
-          )
-        ).to.be.revertedWith('MerkleDistributor: No claimable tokens')
+          distributor
+            .connect(signers[1])
+            .claimDistribution(await token.getAddress(), 100, tree.getProof(0))
+        ).to.be.revertedWithCustomError(distributor, 'NothingToClaim()')
       })
 
       it('cannot claim more than once: 1 and then 0', async () => {
         const { distributor, token, tree } = await loadFixture(fixture2)
 
-        await distributor.claimDistribution(
-          await token.getAddress(),
-          1,
-          accounts[2],
-          101,
-          tree.getProof(1)
-        )
-        await distributor.claimDistribution(
-          await token.getAddress(),
-          0,
-          accounts[1],
-          100,
-          tree.getProof(0)
-        )
+        await distributor
+          .connect(signers[2])
+          .claimDistribution(await token.getAddress(), 101, tree.getProof(1))
+        await distributor
+          .connect(signers[1])
+          .claimDistribution(await token.getAddress(), 100, tree.getProof(0))
 
         await expect(
-          distributor.claimDistribution(
-            await token.getAddress(),
-            1,
-            accounts[2],
-            101,
-            tree.getProof(1)
-          )
-        ).to.be.revertedWith('MerkleDistributor: No claimable tokens')
+          distributor
+            .connect(signers[2])
+            .claimDistribution(await token.getAddress(), 101, tree.getProof(1))
+        ).to.be.revertedWithCustomError(distributor, 'NothingToClaim()')
       })
 
       it('cannot claim for address other than proof', async () => {
@@ -159,8 +143,8 @@ describe('MerkleDistributor', () => {
 
         const proof0 = tree.getProof(0)
         await expect(
-          distributor.claimDistribution(await token.getAddress(), 1, accounts[2], 101, proof0)
-        ).to.be.revertedWith('MerkleDistributor: Invalid proof')
+          distributor.connect(signers[2]).claimDistribution(await token.getAddress(), 101, proof0)
+        ).to.be.revertedWithCustomError(distributor, 'InvalidProof()')
       })
 
       it('cannot claim more than proof', async () => {
@@ -168,8 +152,8 @@ describe('MerkleDistributor', () => {
 
         const proof0 = tree.getProof(0)
         await expect(
-          distributor.claimDistribution(await token.getAddress(), 0, accounts[1], 101, proof0)
-        ).to.be.revertedWith('MerkleDistributor: Invalid proof')
+          distributor.connect(signers[1]).claimDistribution(await token.getAddress(), 101, proof0)
+        ).to.be.revertedWithCustomError(distributor, 'InvalidProof()')
       })
 
       it('cannot claim distribution that does not exist', async () => {
@@ -177,31 +161,13 @@ describe('MerkleDistributor', () => {
 
         const proof0 = tree.getProof(0)
         await expect(
-          distributor.claimDistribution(accounts[2], 0, accounts[1], 101, proof0)
-        ).to.be.revertedWith('MerkleDistributor: Distribution does not exist')
-      })
-
-      it('can set expiryTimestamp', async () => {
-        const { distributor, token } = await loadFixture(fixture2)
-
-        await distributor.setExpiryTimestamp(await token.getAddress(), 100000)
-        expect((await distributor.distributions(await token.getAddress()))[2]).to.eq(100000)
-        await expect(
-          distributor.setExpiryTimestamp(await token.getAddress(), 99999)
-        ).to.be.revertedWith('MerkleDistributor: Invalid expiry timestamp')
-        await distributor.setExpiryTimestamp(await token.getAddress(), 101000)
-        expect((await distributor.distributions(await token.getAddress()))[2]).to.eq(101000)
+          distributor.connect(signers[1]).claimDistribution(accounts[2], 101, proof0)
+        ).to.be.revertedWithCustomError(distributor, 'DistributionNotFound()')
       })
 
       it('can pause for withdrawal', async () => {
         const { distributor, token } = await loadFixture(fixture2)
 
-        let ts = (await ethers.provider.getBlock('latest'))?.timestamp || 0
-        await distributor.setExpiryTimestamp(await token.getAddress(), ts + 10000)
-        await expect(distributor.pauseForWithdrawal(await token.getAddress())).to.be.revertedWith(
-          'MerkleDistributor: Expiry timestamp not reached'
-        )
-        await time.increase(10000)
         await distributor.pauseForWithdrawal(await token.getAddress())
         expect((await distributor.distributions(await token.getAddress()))[1]).to.eq(true)
       })
@@ -210,21 +176,22 @@ describe('MerkleDistributor', () => {
         const { distributor, token, tree } = await loadFixture(fixture2)
 
         await expect(
-          distributor.withdrawUnclaimedTokens(await token.getAddress(), tree.root, 0)
-        ).to.be.revertedWith('MerkleDistributor: Distribution is not paused')
-        await distributor.claimDistribution(
-          await token.getAddress(),
-          1,
-          accounts[2],
-          101,
-          tree.getProof(1)
-        )
+          distributor.withdrawUnclaimedTokens(await token.getAddress(), tree.root, ZERO_BYTES32, 0)
+        ).to.be.revertedWithCustomError(distributor, 'DistributionNotPaused()')
+        await distributor
+          .connect(signers[2])
+          .claimDistribution(await token.getAddress(), 101, tree.getProof(1))
         await distributor.pauseForWithdrawal(await token.getAddress())
-        await distributor.withdrawUnclaimedTokens(await token.getAddress(), tree.root, 101)
+        await distributor.withdrawUnclaimedTokens(
+          await token.getAddress(),
+          tree.root,
+          ZERO_BYTES32,
+          101
+        )
         let distribution = await distributor.distributions(await token.getAddress())
         expect(distribution[1]).to.eq(false)
-        expect(distribution[3]).to.eq(tree.root)
-        expect(distribution[4]).to.eq(101)
+        expect(distribution[2]).to.eq(tree.root)
+        expect(distribution[3]).to.eq(ZERO_BYTES32)
         expect(await token.balanceOf(await distributor.getAddress())).to.eq(0n)
       })
     })
@@ -251,12 +218,9 @@ describe('MerkleDistributor', () => {
         await token.transfer(await distributor.getAddress(), 201n)
         await token2.transfer(await distributor.getAddress(), 201n)
         await token3.transfer(await distributor.getAddress(), 201n)
-        await distributor.addDistributions(
-          [await token.getAddress(), await token2.getAddress(), await token3.getAddress()],
-          [tree.root, tree.root, tree.root],
-          [201n, 201n, 201n],
-          [0, 0, 0]
-        )
+        await distributor.addDistribution(await token.getAddress(), tree.root, ZERO_BYTES32, 201n)
+        await distributor.addDistribution(await token2.getAddress(), tree.root, ZERO_BYTES32, 201n)
+        await distributor.addDistribution(await token3.getAddress(), tree.root, ZERO_BYTES32, 201n)
 
         return { distributor, token, token2, token3, tree }
       }
@@ -266,26 +230,26 @@ describe('MerkleDistributor', () => {
 
         const proof0 = tree.getProof(0)
         await expect(
-          distributor.claimDistribution(await token.getAddress(), 0, accounts[1], 100, proof0)
+          distributor.connect(signers[1]).claimDistribution(await token.getAddress(), 100, proof0)
         )
           .to.emit(distributor, 'Claimed')
-          .withArgs(await token.getAddress(), 0, accounts[1], 100)
+          .withArgs(accounts[1], await token.getAddress(), 100)
         await expect(
-          distributor.claimDistribution(await token2.getAddress(), 0, accounts[1], 100, proof0)
+          distributor.connect(signers[1]).claimDistribution(await token2.getAddress(), 100, proof0)
         )
           .to.emit(distributor, 'Claimed')
-          .withArgs(await token2.getAddress(), 0, accounts[1], 100)
+          .withArgs(accounts[1], await token2.getAddress(), 100)
         const proof1 = tree.getProof(1)
         await expect(
-          distributor.claimDistribution(await token.getAddress(), 1, accounts[2], 101, proof1)
+          distributor.connect(signers[2]).claimDistribution(await token.getAddress(), 101, proof1)
         )
           .to.emit(distributor, 'Claimed')
-          .withArgs(await token.getAddress(), 1, accounts[2], 101)
+          .withArgs(accounts[2], await token.getAddress(), 101)
         await expect(
-          distributor.claimDistribution(await token3.getAddress(), 1, accounts[2], 101, proof1)
+          distributor.connect(signers[2]).claimDistribution(await token3.getAddress(), 101, proof1)
         )
           .to.emit(distributor, 'Claimed')
-          .withArgs(await token3.getAddress(), 1, accounts[2], 101)
+          .withArgs(accounts[2], await token3.getAddress(), 101)
       })
 
       it('transfers the token', async () => {
@@ -293,11 +257,17 @@ describe('MerkleDistributor', () => {
 
         const proof0 = tree.getProof(0)
         expect(await token.balanceOf(accounts[1])).to.eq(0)
-        await distributor.claimDistribution(await token.getAddress(), 0, accounts[1], 100, proof0)
+        await distributor
+          .connect(signers[1])
+          .claimDistribution(await token.getAddress(), 100, proof0)
         expect(await token.balanceOf(accounts[1])).to.eq(100)
-        await distributor.claimDistribution(await token2.getAddress(), 0, accounts[1], 100, proof0)
+        await distributor
+          .connect(signers[1])
+          .claimDistribution(await token2.getAddress(), 100, proof0)
         expect(await token2.balanceOf(accounts[1])).to.eq(100)
-        await distributor.claimDistribution(await token3.getAddress(), 0, accounts[1], 100, proof0)
+        await distributor
+          .connect(signers[1])
+          .claimDistribution(await token3.getAddress(), 100, proof0)
         expect(await token3.balanceOf(accounts[1])).to.eq(100)
       })
 
@@ -307,13 +277,17 @@ describe('MerkleDistributor', () => {
         const proof0 = tree.getProof(0)
         expect(await distributor.getClaimed(await token.getAddress(), accounts[1])).to.eq(0)
         expect(await distributor.getClaimed(await token.getAddress(), accounts[2])).to.eq(0)
-        await distributor.claimDistribution(await token.getAddress(), 0, accounts[1], 100, proof0)
+        await distributor
+          .connect(signers[1])
+          .claimDistribution(await token.getAddress(), 100, proof0)
         expect(await distributor.getClaimed(await token.getAddress(), accounts[1])).to.eq(100)
         expect(await distributor.getClaimed(await token.getAddress(), accounts[2])).to.eq(0)
 
         expect(await distributor.getClaimed(await token2.getAddress(), accounts[1])).to.eq(0)
         expect(await distributor.getClaimed(await token2.getAddress(), accounts[2])).to.eq(0)
-        await distributor.claimDistribution(await token2.getAddress(), 0, accounts[1], 100, proof0)
+        await distributor
+          .connect(signers[1])
+          .claimDistribution(await token2.getAddress(), 100, proof0)
         expect(await distributor.getClaimed(await token2.getAddress(), accounts[1])).to.eq(100)
         expect(await distributor.getClaimed(await token2.getAddress(), accounts[2])).to.eq(0)
       })
@@ -322,28 +296,19 @@ describe('MerkleDistributor', () => {
         const { distributor, token, token2, tree } = await loadFixture(fixture3)
 
         const proof0 = tree.getProof(0)
-        await distributor.claimDistribution(await token.getAddress(), 0, accounts[1], 100, proof0)
+        await distributor
+          .connect(signers[1])
+          .claimDistribution(await token.getAddress(), 100, proof0)
         await expect(
-          distributor.claimDistribution(await token.getAddress(), 0, accounts[1], 100, proof0)
-        ).to.be.revertedWith('MerkleDistributor: No claimable tokens')
+          distributor.connect(signers[1]).claimDistribution(await token.getAddress(), 100, proof0)
+        ).to.be.revertedWithCustomError(distributor, 'NothingToClaim()')
 
-        await distributor.claimDistribution(await token2.getAddress(), 0, accounts[1], 100, proof0)
+        await distributor
+          .connect(signers[1])
+          .claimDistribution(await token2.getAddress(), 100, proof0)
         await expect(
-          distributor.claimDistribution(await token2.getAddress(), 0, accounts[1], 100, proof0)
-        ).to.be.revertedWith('MerkleDistributor: No claimable tokens')
-      })
-
-      it('cannot add distributions of unequal length', async () => {
-        const { distributor, token, token2, tree } = await loadFixture(fixture3)
-
-        await expect(
-          distributor.addDistributions(
-            [await token.getAddress(), await token2.getAddress(), await token2.getAddress()],
-            [tree.root, tree.root],
-            [201n, 201n],
-            [0, 0]
-          )
-        ).to.be.revertedWith('MerkleDistributor: Array lengths need to match')
+          distributor.connect(signers[1]).claimDistribution(await token2.getAddress(), 100, proof0)
+        ).to.be.revertedWithCustomError(distributor, 'NothingToClaim()')
       })
 
       it('can update distributions', async () => {
@@ -356,28 +321,37 @@ describe('MerkleDistributor', () => {
           ],
           ['address', 'uint256']
         )
-        let proof0 = tree.getProof(0)
 
-        await distributor.claimDistribution(await token.getAddress(), 0, accounts[1], 100, proof0)
+        await distributor
+          .connect(signers[1])
+          .claimDistribution(await token.getAddress(), 100, tree.getProof(0))
         await token.transfer(await distributor.getAddress(), 200n)
         await token3.transfer(await distributor.getAddress(), 200n)
-        await distributor.updateDistributions(
-          [await token.getAddress(), await token3.getAddress()],
-          [newTree.root, newTree.root],
-          [200n, 200n],
-          [100, 0]
+        await distributor.updateDistribution(
+          await token.getAddress(),
+          newTree.root,
+          ZERO_BYTES32,
+          401n
+        )
+        await distributor.updateDistribution(
+          await token3.getAddress(),
+          newTree.root,
+          ZERO_BYTES32,
+          401n
         )
 
-        expect((await distributor.distributions(await token.getAddress()))[2]).to.eq(100)
-        expect((await distributor.distributions(await token.getAddress()))[4]).to.eq(401)
-
-        proof0 = newTree.getProof(0)
-        let proof1 = newTree.getProof(1)
-
-        await distributor.claimDistribution(await token.getAddress(), 0, accounts[1], 200, proof0)
-        await distributor.claimDistribution(await token.getAddress(), 1, accounts[2], 201, proof1)
-        await distributor.claimDistribution(await token3.getAddress(), 0, accounts[1], 200, proof0)
-        await distributor.claimDistribution(await token3.getAddress(), 1, accounts[2], 201, proof1)
+        await distributor
+          .connect(signers[1])
+          .claimDistribution(await token.getAddress(), 200, newTree.getProof(0))
+        await distributor
+          .connect(signers[2])
+          .claimDistribution(await token.getAddress(), 201, newTree.getProof(1))
+        await distributor
+          .connect(signers[1])
+          .claimDistribution(await token3.getAddress(), 200, newTree.getProof(0))
+        await distributor
+          .connect(signers[2])
+          .claimDistribution(await token3.getAddress(), 201, newTree.getProof(1))
         expect(await distributor.getClaimed(await token.getAddress(), accounts[1])).to.eq(200)
         expect(await distributor.getClaimed(await token.getAddress(), accounts[2])).to.eq(201)
         expect(await distributor.getClaimed(await token3.getAddress(), accounts[1])).to.eq(200)
@@ -388,31 +362,13 @@ describe('MerkleDistributor', () => {
         expect(await token3.balanceOf(accounts[2])).to.eq(201)
       })
 
-      it('cannot update distributions of unequal length', async () => {
-        const { distributor, token, token2, tree } = await loadFixture(fixture3)
-
-        await expect(
-          distributor.updateDistributions(
-            [await token.getAddress(), await token2.getAddress(), await token2.getAddress()],
-            [tree.root, tree.root],
-            [201n, 201n],
-            [0, 0]
-          )
-        ).to.be.revertedWith('MerkleDistributor: Array lengths need to match')
-      })
-
       it('cannot update distribution that does not exist', async () => {
         const { distributor, token, tree } = await loadFixture(fixture3)
 
         await token.transfer(await distributor.getAddress(), 201n)
         await expect(
-          distributor.updateDistributions(
-            [await token.getAddress(), accounts[2]],
-            [tree.root, tree.root],
-            [201n, 201n],
-            [0, 0]
-          )
-        ).to.be.revertedWith('MerkleDistributor: Distribution does not exist')
+          distributor.updateDistribution(accounts[2], tree.root, ZERO_BYTES32, 201n)
+        ).to.be.revertedWithCustomError(distributor, 'DistributionNotFound()')
       })
 
       it('can claim multiple distributions', async () => {
@@ -420,13 +376,13 @@ describe('MerkleDistributor', () => {
 
         const proof0 = tree.getProof(0)
 
-        await distributor.claimDistributions(
-          [await token.getAddress(), await token3.getAddress()],
-          [0, 0],
-          accounts[1],
-          [100, 100],
-          [proof0, proof0]
-        )
+        await distributor
+          .connect(signers[1])
+          .claimDistributions(
+            [await token.getAddress(), await token3.getAddress()],
+            [100, 100],
+            [proof0, proof0]
+          )
         expect(await distributor.getClaimed(await token.getAddress(), accounts[1])).to.eq(100)
         expect(await distributor.getClaimed(await token3.getAddress(), accounts[1])).to.eq(100)
       })
