@@ -21,7 +21,7 @@ contract MerkleDistributor is Ownable {
         bytes32 ipfsHash;
     }
     address[] private tokens;
-    mapping(address => Distribution) private distributions;
+    mapping(address => Distribution) public distributions;
     mapping(address => mapping(address => uint256)) private claimed;
 
     event Claimed(address indexed account, address indexed token, uint256 amount);
