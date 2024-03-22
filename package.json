@@ -5,6 +5,7 @@
   "license": "MIT",
   "scripts": {
     "start": "npx hardhat node --network hardhat",
+    "test": "npx hardhat test --network hardhat",
     "compile": "npx hardhat compile",
     "deploy-merkle-distributor": "npx ts-node --files scripts/deploy/deploy-merkle-distributor.ts",
     "tsc": "tsc",

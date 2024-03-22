@@ -27,7 +27,7 @@ function generateNewTree(oldTreeData: any, balanceMap: any) {
   accounts.forEach((account, index) => {
     newTreeData[account] = {
       index: index.toString(),
-      amount: (BigInt(balanceMap[account]) + BigInt(oldTreeData[account].amount || 0)).toString(),
+      amount: (BigInt(balanceMap[account]) + BigInt(oldTreeData[account]?.amount || 0)).toString(),
     }
   })
 
