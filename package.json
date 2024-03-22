@@ -9,8 +9,8 @@
     "compile": "npx hardhat compile",
     "deploy-merkle-distributor": "npx ts-node --files scripts/deploy/deploy-merkle-distributor.ts",
     "tsc": "tsc",
-    "prettier": "prettier --check \"contracts/**/*.sol*\" \"test/**/*.ts*\" \"src/**/*.ts*\" \"scripts/**/*.ts*\"",
-    "prettier:fix": "prettier --write \"contracts/**/*.sol*\" \"test/**/*.ts*\" \"src/**/*.ts*\" \"scripts/**/*.ts*\""
+    "prettier": "prettier --check \"contracts/**/*.sol*\" \"test/**/*.ts*\" \"scripts/**/*.ts*\"",
+    "prettier:fix": "prettier --write \"contracts/**/*.sol*\" \"test/**/*.ts*\" \"scripts/**/*.ts*\""
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-chai-matchers": "^2.0.0",
