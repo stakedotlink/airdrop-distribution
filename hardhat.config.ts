@@ -1,5 +1,5 @@
 import { HardhatUserConfig } from 'hardhat/config'
-import '@nomiclabs/hardhat-ethers'
+import '@nomicfoundation/hardhat-toolbox'
 
 const balance = '100000000000000000000000'
 const accounts = [
@@ -18,20 +18,21 @@ const config: HardhatUserConfig = {
       url: 'http://127.0.0.1:8545',
       accounts,
     },
-    rinkeby: {
-      url: '',
-      accounts,
-    },
-    ropsten: {
-      url: '',
-      accounts,
-    },
     mainnet: {
       url: '',
       accounts,
     },
     hardhat: {
       accounts: accounts.map((acct) => ({ privateKey: acct, balance })),
+    },
+  },
+  solidity: {
+    version: '0.8.24',
+    settings: {
+      optimizer: {
+        enabled: true,
+        runs: 200,
+      },
     },
   },
 }

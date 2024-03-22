@@ -1,28 +1,13 @@
-import { Contract } from 'ethers'
-import { ethers, network } from 'hardhat'
 import fse from 'fs-extra'
+import { ethers, network } from 'hardhat'
 
-export const getContract = async (contractName: string): Promise<Contract> => {
-  const deployments = getDeployments()
-  const abis = getAbis()
-  const contract = deployments[contractName]
-
-  if (!contract) {
-    throw Error('Contract cannot be found on the selected network')
-  }
-
-  return ethers.getContractAt(abis[contract.abi], contract.address)
+export const deploy = async (contractName: string, args: any[] = []): Promise<any> => {
+  return (await ethers.deployContract(contractName, args)).waitForDeployment()
 }
 
-export const isTokenSupported = (tokenName: string): boolean => {
-  const deployments = getDeployments()
-  return deployments[tokenName] != undefined
-}
-
-const getDeployments = () => {
-  const deployments = fse.readJSONSync(`contracts/deployments/${network.name}.json`, {
-    throws: false,
-  })
+export const getDeployments = () => {
+  fse.ensureFileSync(`deployments/${network.name}.json`)
+  const deployments = fse.readJSONSync(`deployments/${network.name}.json`, { throws: false })
 
   if (!deployments) {
     return {}
@@ -31,6 +16,34 @@ const getDeployments = () => {
   return deployments
 }
 
-const getAbis = () => {
-  return fse.readJSONSync(`contracts/abis.json`)
+export const updateDeployments = (
+  newDeployments: { [key: string]: string },
+  artifactMap: { [key: string]: string } = {}
+) => {
+  const deployments = getDeployments()
+
+  let contractNames = Object.keys(newDeployments)
+  let newDeploymentsWithArtifacts = contractNames.reduce(
+    (acc, name: string) => (
+      (acc[name] = { address: newDeployments[name], artifact: artifactMap[name] || name }), acc
+    ),
+    {} as any
+  )
+
+  fse.outputJSONSync(
+    `deployments/${network.name}.json`,
+    { ...deployments, ...newDeploymentsWithArtifacts },
+    { spaces: 2 }
+  )
+}
+
+export const getContract = async (contractName: string) => {
+  const deployments = getDeployments()
+  const contract = deployments[contractName]
+
+  if (!contract) {
+    throw Error('Deployed contract does not exist')
+  }
+
+  return ethers.getContractAt(contract.artifact, contract.address)
 }
