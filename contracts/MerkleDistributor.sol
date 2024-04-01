@@ -75,6 +75,22 @@ contract MerkleDistributor is Ownable {
     }
 
     /**
+     * @notice Returns the total amount that a user has claimed across all distributions
+     * @param _account address of account
+     * @return claimed account's claimed amount for each distribution
+     */
+    function getAllClaimed(address _account) external view returns (uint256[] memory) {
+        uint256 tokenCount = tokens.length;
+        uint256[] memory retClaimed = new uint256[](tokenCount);
+
+        for (uint256 i = 0; i < tokenCount; ++i) {
+            retClaimed[i] = getClaimed(tokens[i], _account);
+        }
+
+        return retClaimed;
+    }
+
+    /**
      * @notice adds a token distribution
      * @param _token token address
      * @param _merkleRoot merkle root for the distribution tree
