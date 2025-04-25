@@ -14,27 +14,12 @@ const accounts = [
 const config: HardhatUserConfig = {
   defaultNetwork: 'localhost',
   networks: {
-    localhost: {
-      url: 'http://127.0.0.1:8545',
-      accounts,
-    },
-    mainnet: {
-      url: '',
-      accounts,
-    },
-    hardhat: {
-      accounts: accounts.map((acct) => ({ privateKey: acct, balance })),
-    },
+    localhost: { url: 'http://127.0.0.1:8545', accounts },
+    mainnet: { url: '', accounts },
+    hardhat: { accounts: accounts.map((acct) => ({ privateKey: acct, balance })) },
   },
-  solidity: {
-    version: '0.8.24',
-    settings: {
-      optimizer: {
-        enabled: true,
-        runs: 200,
-      },
-    },
-  },
+  solidity: { version: '0.8.29', settings: { optimizer: { enabled: true, runs: 200 } } },
+  gasReporter: { enabled: false },
 }
 
 export default config
