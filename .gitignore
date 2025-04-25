@@ -1,2 +1,15 @@
 node_modules
-.envrc
+.env
+/deployments/localhost.json
+
+# Hardhat files
+/cache
+/artifacts
+
+# TypeChain files
+/typechain
+/typechain-types
+
+# solidity-coverage files
+/coverage
+/coverage.json
