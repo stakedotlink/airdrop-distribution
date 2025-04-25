@@ -3,14 +3,16 @@ on: [push]
 
 jobs:
   ci:
-    name: Lint
+    name: Lint & Test
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout the repo
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
+        with:
+          submodules: recursive
 
-      - uses: actions/cache@v2
+      - uses: actions/cache@v3
         with:
           path: "**/node_modules"
           key: ${{ runner.os }}-modules-${{ hashFiles('**/yarn.lock') }}
@@ -18,5 +20,18 @@ jobs:
       - name: Install Yarn dependencies
         run: yarn install
 
+      - name: Run solhint
+        run: yarn solhint
+
       - name: Run prettier
         run: yarn prettier
+
+      - name: Hardhat clean
+        run: npx hardhat clean
+
+      - name: Compile contracts
+        run: yarn compile
+
+      - name: Run tests
+        run: |
+          yarn test

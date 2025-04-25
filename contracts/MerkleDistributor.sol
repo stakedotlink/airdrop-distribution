@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity 0.8.24;
+pragma solidity 0.8.29;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
@@ -25,8 +25,18 @@ contract MerkleDistributor is Ownable {
     mapping(address => mapping(address => uint256)) private claimed;
 
     event Claimed(address indexed account, address indexed token, uint256 amount);
-    event DistributionUpdated(address indexed token, bytes32 merkleRoot, bytes32 ipfsHash, uint256 totalAmount);
-    event WithdrawUnclaimedTokens(address indexed token, bytes32 merkleRoot, bytes32 ipfsHash, uint256 totalAmount);
+    event DistributionUpdated(
+        address indexed token,
+        bytes32 merkleRoot,
+        bytes32 ipfsHash,
+        uint256 totalAmount
+    );
+    event WithdrawUnclaimedTokens(
+        address indexed token,
+        bytes32 merkleRoot,
+        bytes32 ipfsHash,
+        uint256 totalAmount
+    );
 
     error DistributionExists();
     error DistributionNotFound();
@@ -97,7 +107,12 @@ contract MerkleDistributor is Ownable {
      * @param _ipfsHash ipfs hash for the distribution tree (CIDv0, no prefix - only hash)
      * @param _totalAmount total distribution amount
      **/
-    function addDistribution(address _token, bytes32 _merkleRoot, bytes32 _ipfsHash, uint256 _totalAmount) public onlyOwner {
+    function addDistribution(
+        address _token,
+        bytes32 _merkleRoot,
+        bytes32 _ipfsHash,
+        uint256 _totalAmount
+    ) public onlyOwner {
         if (distributions[_token].token != address(0)) revert DistributionExists();
 
         tokens.push(_token);
@@ -143,7 +158,8 @@ contract MerkleDistributor is Ownable {
         uint256[] calldata _amounts,
         bytes32[][] calldata _merkleProofs
     ) external {
-        if (_tokens.length != _amounts.length || _tokens.length != _merkleProofs.length) revert InvalidLengths();
+        if (_tokens.length != _amounts.length || _tokens.length != _merkleProofs.length)
+            revert InvalidLengths();
 
         for (uint256 i = 0; i < _tokens.length; ++i) {
             claimDistribution(_tokens[i], _amounts[i], _merkleProofs[i]);
