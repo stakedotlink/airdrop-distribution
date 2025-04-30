@@ -18,7 +18,7 @@ contract MerkleDistributor is Ownable {
         address token;
         bool isPaused;
         bytes32 merkleRoot;
-        bytes32 ipfsHash;
+        string ipfsHash;
     }
     address[] private tokens;
     mapping(address => Distribution) public distributions;
@@ -28,13 +28,13 @@ contract MerkleDistributor is Ownable {
     event DistributionUpdated(
         address indexed token,
         bytes32 merkleRoot,
-        bytes32 ipfsHash,
+        string ipfsHash,
         uint256 totalAmount
     );
     event WithdrawUnclaimedTokens(
         address indexed token,
         bytes32 merkleRoot,
-        bytes32 ipfsHash,
+        string ipfsHash,
         uint256 totalAmount
     );
 
@@ -48,13 +48,16 @@ contract MerkleDistributor is Ownable {
 
     constructor() Ownable(msg.sender) {}
 
+    /**
+     * @notice Reverts if no distribution exists for _token
+     **/
     modifier distributionExists(address _token) {
         if (distributions[_token].token == address(0)) revert DistributionNotFound();
         _;
     }
 
     /**
-     * @notice returns a list of all supported tokens
+     * @notice Returns a list of all supported tokens
      * @return list of supported tokens
      **/
     function getTokens() external view returns (address[] memory) {
@@ -62,7 +65,7 @@ contract MerkleDistributor is Ownable {
     }
 
     /**
-     * @notice returns a list of all distributions
+     * @notice Returns a list of all distributions
      * @return list of distributions
      **/
     function getDistributions() external view returns (Distribution[] memory) {
@@ -76,9 +79,9 @@ contract MerkleDistributor is Ownable {
     }
 
     /**
-     * @notice returns the total amount that an account has claimed from a distribution
+     * @notice Returns the total amount that an account has claimed from a distribution
      * @param _token token address
-     * @param _account address of the account to return claimed amount for
+     * @param _account address of account
      **/
     function getClaimed(address _token, address _account) public view returns (uint256) {
         return claimed[_token][_account];
@@ -101,16 +104,16 @@ contract MerkleDistributor is Ownable {
     }
 
     /**
-     * @notice adds a token distribution
+     * @notice Adds a new token distribution
      * @param _token token address
      * @param _merkleRoot merkle root for the distribution tree
-     * @param _ipfsHash ipfs hash for the distribution tree (CIDv0, no prefix - only hash)
+     * @param _ipfsHash ipfs hash for the distribution tree (CIDv1)
      * @param _totalAmount total distribution amount
      **/
     function addDistribution(
         address _token,
         bytes32 _merkleRoot,
-        bytes32 _ipfsHash,
+        string calldata _ipfsHash,
         uint256 _totalAmount
     ) public onlyOwner {
         if (distributions[_token].token != address(0)) revert DistributionExists();
@@ -124,19 +127,19 @@ contract MerkleDistributor is Ownable {
     }
 
     /**
-     * @notice updates a token distribution by distributing additional tokens
-     * @dev merkle tree should be updated to reflect additional amount - the amount for each
+     * @notice Updates an existing token distribution by distributing additional tokens
+     * @dev merkle tree should be updated to reflect additional amount -> the amount for each
      * account should be incremented by any additional allocation and any new accounts should be added
      * to the tree
      * @param _token token address
      * @param _merkleRoot updated merkle root for the distribution tree
-     * @param _ipfsHash ipfs hash for the distribution tree (CIDv0, no prefix - only hash)
+     * @param _ipfsHash ipfs hash for the distribution tree (CIDv1)
      * @param _totalAmount total distribution amount including existing and additional amount
      **/
     function updateDistribution(
         address _token,
         bytes32 _merkleRoot,
-        bytes32 _ipfsHash,
+        string calldata _ipfsHash,
         uint256 _totalAmount
     ) public onlyOwner distributionExists(_token) {
         if (distributions[_token].isPaused) revert DistributionPaused();
@@ -148,8 +151,8 @@ contract MerkleDistributor is Ownable {
     }
 
     /**
-     * @notice claims multiple token distributions
-     * @param _tokens list of token address
+     * @notice Claims multiple token distributions
+     * @param _tokens list of token addresses
      * @param _amounts list of amounts as recorded in sender's merkle tree entries
      * @param _merkleProofs list of merkle proofs for the token claims
      **/
@@ -167,7 +170,7 @@ contract MerkleDistributor is Ownable {
     }
 
     /**
-     * @notice claims a token distribution
+     * @notice Claims a token distribution
      * @param _token token address
      * @param _amount amount as recorded in sender's merkle tree entry
      * @param _merkleProof merkle proof for the token claim
@@ -193,18 +196,18 @@ contract MerkleDistributor is Ownable {
     }
 
     /**
-     * @notice withdraws unclaimed tokens
-     * @dev merkle tree should be updated to reflect current state of claims - the amount for each
+     * @notice Withdraws unclaimed tokens
+     * @dev merkle tree should be updated to reflect current state of claims -> the amount for each
      * account should be set to equal claimed[account]
      * @param _token token address
      * @param _merkleRoot updated merkle root for the distribution tree
-     * @param _ipfsHash updated ipfs hash for the distribution tree (CIDv0, no prefix - only hash)
+     * @param _ipfsHash updated ipfs hash for the distribution tree (CIDv1)
      * @param _totalAmount updated total amount (should be equal to the total claimed amount across all accounts)
      **/
     function withdrawUnclaimedTokens(
         address _token,
         bytes32 _merkleRoot,
-        bytes32 _ipfsHash,
+        string calldata _ipfsHash,
         uint256 _totalAmount
     ) external onlyOwner distributionExists(_token) {
         if (!distributions[_token].isPaused) revert DistributionNotPaused();
@@ -223,8 +226,8 @@ contract MerkleDistributor is Ownable {
     }
 
     /**
-     * @notice pauses a token distribution for withdrawal of unclaimed tokens
-     * @dev must be called before withdrawUnlclaimedTokens to ensure state doesn't change
+     * @notice Pauses a token distribution for withdrawal of unclaimed tokens
+     * @dev must be called before withdrawUnclaimedTokens to ensure state doesn't change
      * while the new merkle root is calculated
      * @param _token token address
      **/
