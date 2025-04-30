@@ -1,14 +1,18 @@
-import base58 from 'bs58'
 import fs from 'fs'
-import axios from 'axios'
+import { PinataSDK } from 'pinata'
 import { ethers } from 'hardhat'
 import { StandardMerkleTree } from '@openzeppelin/merkle-tree'
 import { getContract } from './utils/helpers'
 import { ERC20, MerkleDistributor } from '../typechain-types'
 
-const tokenAddress = '' // address of token to distribute
-const balanceMapPath = '' // path to balance map that contains amounts to distribute for each address
-const newDistributionAmount = 0n // total amount to distribute
+// address of token to distribute
+const tokenAddress = ''
+// symbol of token to distribute (IPFS file will use this symbol)
+const tokenSymbol = ''
+// path to balance map that contains additional amounts to distribute for each address
+const balanceMapPath = './scripts/balanceMaps/'
+// total additional amount to distribute
+const newDistributionAmount = 0n
 
 function getBalanceMap() {
   const map = JSON.parse(
@@ -22,13 +26,27 @@ function getBalanceMap() {
 
 function generateNewTree(oldTreeData: any, balanceMap: any) {
   const newTreeData: any = {}
-  const accounts = Object.keys(balanceMap)
+
+  Object.keys(oldTreeData).forEach((account) => {
+    if (BigInt(oldTreeData[account].amount) == 0n) throw Error('Zero value in old tree data')
+
+    newTreeData[account] = {
+      amount: BigInt(oldTreeData[account].amount).toString(),
+    }
+  })
+
+  Object.keys(balanceMap).forEach((account) => {
+    if (BigInt(balanceMap[account]) == 0n) throw Error('Zero value in balance map')
+
+    newTreeData[account] = {
+      amount: (BigInt(balanceMap[account]) + BigInt(newTreeData[account]?.amount || 0)).toString(),
+    }
+  })
+
+  const accounts = Object.keys(newTreeData)
 
   accounts.forEach((account, index) => {
-    newTreeData[account] = {
-      index: index.toString(),
-      amount: (BigInt(balanceMap[account]) + BigInt(oldTreeData[account]?.amount || 0)).toString(),
-    }
+    newTreeData[account].index = index.toString()
   })
 
   let tree = StandardMerkleTree.of(
@@ -42,13 +60,16 @@ function generateNewTree(oldTreeData: any, balanceMap: any) {
 async function main() {
   console.log('Generating new tree...')
 
-  const PINATA_GATEWAY_URL = process.env.PINATA_GATEWAY_URL
-  const PINATA_API_URL = process.env.PINATA_API_URL
   const PINATA_JWT = process.env.PINATA_JWT
+  const PINATA_GATEWAY_URL = process.env.PINATA_GATEWAY_URL
 
-  if (PINATA_GATEWAY_URL == undefined) throw Error('PINATA_GATEWAY_URL must be set')
-  if (PINATA_API_URL == undefined) throw Error('PINATA_API_URL must be set')
   if (PINATA_JWT == undefined) throw Error('PINATA_JWT must be set')
+  if (PINATA_GATEWAY_URL == undefined) throw Error('PINATA_GATEWAY_URL must be set')
+
+  const pinata = new PinataSDK({
+    pinataJwt: PINATA_JWT,
+    pinataGateway: PINATA_GATEWAY_URL,
+  })
 
   const tokenContract = (await ethers.getContractAt('ERC20', tokenAddress)) as ERC20
   const distributor = (await getContract('MerkleDistributor')) as MerkleDistributor
@@ -60,10 +81,8 @@ async function main() {
   let oldDistributionAmount = 0n
 
   if (token != ethers.ZeroAddress) {
-    let res: any = await axios.get(
-      `${PINATA_GATEWAY_URL}/ipfs/${base58.encode(Buffer.from('1220' + ipfsHash.slice(2), 'hex'))}`
-    )
-    const data = JSON.parse(res.data)
+    const res = await pinata.gateways.public.get(ipfsHash)
+    const data = Object(res.data)
     if (data.merkleRoot != merkleRoot) {
       throw Error('Merkle roots do not match')
     }
@@ -71,15 +90,16 @@ async function main() {
     oldDistributionAmount = BigInt(data.totalAmount)
   }
 
-  const totalDistributionAmount = oldDistributionAmount + newDistributionAmount
   const balanceMap = getBalanceMap()
-  const accounts = Object.keys(balanceMap)
   const { newTreeData, newMerkleRoot } = generateNewTree(oldTreeData, balanceMap)
+  const accounts = Object.keys(newTreeData)
 
+  const totalDistributionAmount = oldDistributionAmount + newDistributionAmount
   const totalDistributed = accounts.reduce(
     (total, account) => total + BigInt(newTreeData[account].amount),
     0n
   )
+
   if (totalDistributed != totalDistributionAmount) {
     throw Error('Incorrect distribution amount')
   }
@@ -101,29 +121,17 @@ async function main() {
 
   console.log('Pinning tree to IPFS...')
 
-  const res: any = await axios.post(
-    `${PINATA_API_URL}/pinning/pinJSONToIPFS`,
-    {
-      pinataOptions: {
-        cidVersion: 0,
-      },
-      pinataContent: JSON.stringify({
-        merkleRoot: newMerkleRoot,
-        totalAmount: totalDistributionAmount.toString(),
-        data: newTreeData,
-      }),
-    },
-    {
-      headers: {
-        Accept: 'application/json',
-        'Content-Type': 'application/json',
-        Authorization: 'Bearer ' + PINATA_JWT,
-      },
-    }
-  )
+  const upload = await pinata.upload.public
+    .json({
+      tokenSymbol,
+      tokenAddress,
+      merkleRoot: newMerkleRoot,
+      totalAmount: totalDistributionAmount.toString(),
+      data: newTreeData,
+    })
+    .name(`eth-merkle-distributor-${tokenSymbol}.json`)
 
-  const newIpfsCID = res.data.IpfsHash
-  const newIpfsHash = '0x' + Buffer.from(base58.decode(newIpfsCID)).toString('hex').slice(4)
+  const newIpfsHash = upload.cid
 
   console.log('Transferring tokens...')
 
