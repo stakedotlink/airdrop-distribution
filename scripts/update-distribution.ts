@@ -6,28 +6,39 @@ import { getContract } from './utils/helpers'
 import { ERC20, MerkleDistributor } from '../typechain-types'
 
 // address of token to distribute
-const tokenAddress = ''
-// symbol of token to distribute (IPFS file will use this symbol)
-const tokenSymbol = ''
-// path to balance map that contains additional amounts to distribute for each address
-const balanceMapPath = './scripts/balanceMaps/'
-// total additional amount to distribute
-const newDistributionAmount = 0n
+const tokenAddress = '' // 0x514910771AF9Ca656af840dff83E8264EcF986CA
 
-function getBalanceMap() {
-  const map = JSON.parse(
-    fs.readFileSync(balanceMapPath, {
-      encoding: 'utf8',
-    })
+// symbol of token to distribute (IPFS file will use this symbol)
+const tokenSymbol = '' // LINK
+
+// path to balance maps that contain additional amounts to distribute for each address
+const balanceMapPaths: string[] = [] // ['./scripts/balanceMaps/LINK/2025-05-08/map.json']
+
+// optional list of fields corresponding to each balance map (IPFS file will include the distribution amount
+// from each balance map using these fields if they are included)
+const balanceMapFields: string[] = [] // ['stLINKAmount', 'reSDLAmount']
+
+// total additional amount to distribute
+const newDistributionAmount = 0n // 1000000000000000000000n
+
+function getBalanceMaps() {
+  const maps = balanceMapPaths.map((path) =>
+    JSON.parse(
+      fs.readFileSync(path, {
+        encoding: 'utf8',
+      })
+    )
   )
 
-  return map
+  return maps
 }
 
-function generateNewTree(oldTreeData: any, balanceMap: any) {
+function generateNewTree(oldTreeData: any, balanceMaps: any) {
   const newTreeData: any = {}
 
   Object.keys(oldTreeData).forEach((account) => {
+    account = account.toLowerCase()
+
     if (BigInt(oldTreeData[account].amount) == 0n) throw Error('Zero value in old tree data')
 
     newTreeData[account] = {
@@ -35,12 +46,21 @@ function generateNewTree(oldTreeData: any, balanceMap: any) {
     }
   })
 
-  Object.keys(balanceMap).forEach((account) => {
-    if (BigInt(balanceMap[account]) == 0n) throw Error('Zero value in balance map')
+  balanceMaps.forEach((map: any, index: any) => {
+    const mapField = balanceMapFields[index]
 
-    newTreeData[account] = {
-      amount: (BigInt(balanceMap[account]) + BigInt(newTreeData[account]?.amount || 0)).toString(),
-    }
+    Object.keys(map).forEach((account) => {
+      account = account.toLowerCase()
+
+      if (BigInt(map[account]) == 0n) throw Error('Zero value in balance map')
+
+      if (newTreeData[account] == undefined) newTreeData[account] = { amount: 0 }
+
+      newTreeData[account].amount = (
+        BigInt(map[account]) + BigInt(newTreeData[account].amount)
+      ).toString()
+      newTreeData[account][mapField] = map[account].toString()
+    })
   })
 
   const accounts = Object.keys(newTreeData)
@@ -90,8 +110,8 @@ async function main() {
     oldDistributionAmount = BigInt(data.totalAmount)
   }
 
-  const balanceMap = getBalanceMap()
-  const { newTreeData, newMerkleRoot } = generateNewTree(oldTreeData, balanceMap)
+  const balanceMaps = getBalanceMaps()
+  const { newTreeData, newMerkleRoot } = generateNewTree(oldTreeData, balanceMaps)
   const accounts = Object.keys(newTreeData)
 
   const totalDistributionAmount = oldDistributionAmount + newDistributionAmount
