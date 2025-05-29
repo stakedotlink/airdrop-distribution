@@ -2,7 +2,7 @@ import fs from 'fs'
 import { PinataSDK } from 'pinata'
 import { ethers } from 'hardhat'
 import { StandardMerkleTree } from '@openzeppelin/merkle-tree'
-import { getContract } from './utils/helpers'
+import { getContract, getAccounts } from './utils/helpers'
 import { ERC20, MerkleDistributor } from '../typechain-types'
 
 // address of token to distribute
@@ -91,8 +91,14 @@ async function main() {
     pinataGateway: PINATA_GATEWAY_URL,
   })
 
-  const tokenContract = (await ethers.getContractAt('ERC20', tokenAddress)) as ERC20
-  const distributor = (await getContract('MerkleDistributor')) as MerkleDistributor
+  const { signers } = await getAccounts()
+
+  const tokenContract = (await ethers.getContractAt('ERC20', tokenAddress)).connect(
+    signers[6]
+  ) as ERC20
+  const distributor = (await getContract('MerkleDistributor')).connect(
+    signers[6]
+  ) as MerkleDistributor
   const [token, isPaused, merkleRoot, ipfsHash] = await distributor.distributions(tokenAddress)
 
   if (isPaused) throw Error('Distribution is paused')

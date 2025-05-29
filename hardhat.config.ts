@@ -1,5 +1,6 @@
 import { HardhatUserConfig } from 'hardhat/config'
 import '@nomicfoundation/hardhat-toolbox'
+import '@nomicfoundation/hardhat-ledger'
 
 const balance = '100000000000000000000000'
 const accounts = [
@@ -14,9 +15,32 @@ const accounts = [
 const config: HardhatUserConfig = {
   defaultNetwork: 'localhost',
   networks: {
-    localhost: { url: 'http://127.0.0.1:8545', accounts },
-    mainnet: { url: '', accounts },
-    hardhat: { accounts: accounts.map((acct) => ({ privateKey: acct, balance })) },
+    localhost: {
+      url: 'http://127.0.0.1:8545',
+      accounts,
+    },
+    mainnet: {
+      url: '',
+      ledgerAccounts: [],
+      ledgerOptions: {
+        derivationFunction: (x) => `m/44'/60'/0'/${x}`, // legacy derivation path
+      },
+    },
+    hardhat: {
+      chainId: 1337,
+      accounts: accounts.map((acct) => ({ privateKey: acct, balance })),
+      mining: {
+        auto: true,
+        interval: 5000,
+      },
+      // forking: {
+      //   url: '',
+      //   blockNumber: 22376526,
+      // },
+    },
+  },
+  etherscan: {
+    apiKey: '',
   },
   solidity: { version: '0.8.29', settings: { optimizer: { enabled: true, runs: 200 } } },
   gasReporter: { enabled: false },

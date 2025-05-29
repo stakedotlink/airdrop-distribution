@@ -1,8 +1,21 @@
 import fse from 'fs-extra'
 import { ethers, network } from 'hardhat'
 
-export const deploy = async (contractName: string, args: any[] = []): Promise<any> => {
-  return (await ethers.deployContract(contractName, args)).waitForDeployment()
+export const getAccounts = async () => {
+  const signers = await ethers.getSigners()
+  const accounts = await Promise.all(signers.map(async (signer) => signer.getAddress()))
+  return { signers, accounts }
+}
+
+export const deploy = async (
+  contractName: string,
+  args: any[] = [],
+  useLedgerSigner = false
+): Promise<any> => {
+  const signers = await ethers.getSigners()
+  return (
+    await ethers.deployContract(contractName, args, useLedgerSigner ? signers[6] : undefined)
+  ).waitForDeployment()
 }
 
 export const getDeployments = () => {
