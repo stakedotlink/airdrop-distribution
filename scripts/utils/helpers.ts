@@ -58,5 +58,8 @@ export const getContract = async (contractName: string) => {
     throw Error('Deployed contract does not exist')
   }
 
-  return ethers.getContractAt(contract.artifact, contract.address)
+  const { signers } = await getAccounts()
+  return (await ethers.getContractAt(contract.artifact, contract.address)).connect(
+    signers[0]
+  ) as any
 }
