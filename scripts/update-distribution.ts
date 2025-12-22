@@ -21,6 +21,8 @@ const balanceMapFields: string[] = [] // ['stLINKAmount', 'reSDLAmount']
 // total additional amount to distribute
 const newDistributionAmount = 0n // 1000000000000000000000n
 
+const expireDate = 0 // unix timestamp of airdrop expiry
+
 function getBalanceMaps() {
   const maps = balanceMapPaths.map((path) =>
     JSON.parse(
@@ -151,6 +153,7 @@ async function main() {
     .json({
       tokenSymbol,
       tokenAddress,
+      expireDate,
       merkleRoot: newMerkleRoot,
       totalAmount: totalDistributionAmount.toString(),
       data: newTreeData,
