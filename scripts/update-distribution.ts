@@ -2,7 +2,7 @@ import fs from 'fs'
 import { PinataSDK } from 'pinata'
 import { ethers } from 'hardhat'
 import { StandardMerkleTree } from '@openzeppelin/merkle-tree'
-import { getContract, getAccounts } from './utils/helpers'
+import { getContract } from './utils/helpers'
 import { ERC20, MerkleDistributor } from '../typechain-types'
 
 // address of token to distribute
@@ -43,9 +43,8 @@ function generateNewTree(oldTreeData: any, balanceMaps: any) {
 
     if (BigInt(oldTreeData[account].amount) == 0n) throw Error('Zero value in old tree data')
 
-    newTreeData[account] = {
-      amount: BigInt(oldTreeData[account].amount).toString(),
-    }
+    // Copy all fields from old tree data (amount, reSDLAmount, stLINKAmount, etc.)
+    newTreeData[account] = { ...oldTreeData[account] }
   })
 
   balanceMaps.forEach((map: any, index: any) => {
@@ -56,12 +55,16 @@ function generateNewTree(oldTreeData: any, balanceMaps: any) {
 
       if (BigInt(map[account]) == 0n) throw Error('Zero value in balance map')
 
-      if (newTreeData[account] == undefined) newTreeData[account] = { amount: 0 }
+      if (newTreeData[account] == undefined) newTreeData[account] = { amount: '0' }
 
+      // Sum the new amount with existing amount
       newTreeData[account].amount = (
         BigInt(map[account]) + BigInt(newTreeData[account].amount)
       ).toString()
-      newTreeData[account][mapField] = map[account].toString()
+
+      // Sum the new field value with existing field value (if exists)
+      const existingFieldValue = BigInt(newTreeData[account][mapField] || '0')
+      newTreeData[account][mapField] = (existingFieldValue + BigInt(map[account])).toString()
     })
   })
 
@@ -93,14 +96,8 @@ async function main() {
     pinataGateway: PINATA_GATEWAY_URL,
   })
 
-  const { signers } = await getAccounts()
-
-  const tokenContract = (await ethers.getContractAt('ERC20', tokenAddress)).connect(
-    signers[6]
-  ) as ERC20
-  const distributor = (await getContract('MerkleDistributor')).connect(
-    signers[6]
-  ) as MerkleDistributor
+  const tokenContract = (await ethers.getContractAt('ERC20', tokenAddress)) as ERC20
+  const distributor = (await getContract('MerkleDistributor')) as MerkleDistributor
   const [token, isPaused, merkleRoot, ipfsHash] = await distributor.distributions(tokenAddress)
 
   if (isPaused) throw Error('Distribution is paused')
